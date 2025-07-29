@@ -11,10 +11,19 @@ import re
 import os
 
 # Gemini API 설정
-genai.configure(api_key="AIzaSyCjaXGNzHNhXDa1hmBnj0A6CyOgRG5q1vk")
+try:
+    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+except Exception as e:
+    st.error(f"Gemini API 키 설정 오류: {e}")
+    st.stop()
 
 st.set_page_config(page_title="인공지능과 윤리", layout="wide")
 st.title("📝 최근 기사로 알아보는 AI의 권리침해")
+
+# 데이터 디렉토리 확인 및 생성
+DATA_DIR = "data"
+if not os.path.exists(DATA_DIR):
+    os.makedirs(DATA_DIR)
 
 # 요약 함수 정의
 def summarize_article(article_text):
@@ -82,10 +91,14 @@ def infer_rights(text):
 
 # 권리별 기사 기록 저장
 def save_to_csv(title, link, rights):
-    with open("data.csv", "a", encoding="utf-8", newline="") as f:
-        writer = csv.writer(f)
-        for right in rights:
-            writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), title, link, right])
+    csv_path = os.path.join(DATA_DIR, "data.csv")
+    try:
+        with open(csv_path, "a", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            for right in rights:
+                writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), title, link, right])
+    except Exception as e:
+        st.error(f"CSV 저장 오류: {e}")
 
 # 키워드 하이라이팅 함수
 def highlight_keywords(text):
@@ -143,9 +156,9 @@ with col_center:
                 st.markdown("🔍 관련 권리 탐색 필요")
 
     st.subheader("📌 기사 링크 입력")
-    url_input = st.text_input("기사 링크를 입력하세요:")
+    url_input = st.text_input("기사 링크를 입력하세요:", key="url_input")
 
-    if st.button("🧠요약하기", key="summarize_button"):
+    if st.button("🧠 요약하기", key="summarize_button"):
         if not url_input.strip():
             st.warning("URL을 입력해주세요.")
         else:
@@ -168,18 +181,20 @@ with col_center:
             st.warning("⚠️ 이름과 생각을 모두 입력해주세요.")
         else:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            txt_path = os.path.join(DATA_DIR, "data.txt")
             try:
-                with open("data.txt", "a", encoding="utf-8") as f:
+                with open(txt_path, "a", encoding="utf-8") as f:
                     f.write(f"[{timestamp}] {user_name}:\n{user_thought}\n\n")
                 st.success("✅ 생각이 성공적으로 제출되었습니다!")
             except Exception as e:
-                st.error(f"파일 저장 중 오류가 발생했습니다: {e}")
+                st.error(f"파일 저장 중 오류: {e}")
 
     if st.session_state.get("login_role") == "교사":
         st.markdown("---")
         st.subheader("📋 학생 제출 내용 열람")
-        if os.path.exists("data.txt"):
-            with open("data.txt", "r", encoding="utf-8") as f:
+        txt_path = os.path.join(DATA_DIR, "data.txt")
+        if os.path.exists(txt_path):
+            with open(txt_path, "r", encoding="utf-8") as f:
                 st.text(f.read())
         else:
             st.info("아직 제출된 학생의 생각이 없습니다.")

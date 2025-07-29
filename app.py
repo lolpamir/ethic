@@ -13,7 +13,7 @@ from io import StringIO
 
 # Gemini API 설정
 try:
-    genai.configure(api_key=os.getenv("AIzaSyCjaXGNzHNhXDa1hmBnj0A6CyOgRG5q1vk"))
+    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 except Exception as e:
     st.error(f"Gemini API 키 설정 오류: {e}. Streamlit Cloud의 Secrets 설정에서 GEMINI_API_KEY를 확인하세요.")
     st.stop()

@@ -198,10 +198,7 @@ with col_center:
             txt_path = os.path.join(DATA_DIR, "data.txt")
             try:
                 with open(txt_path, "a", encoding="utf-8") as f:
-                    f.write(f"[{timestamp}] {user_name}:
-{user_thought}
-
-")
+                    f.write( f,"[{timestamp}] {user_name}:\n{user_thought}\n\n")
                 st.success("✅ 생각이 성공적으로 제출되었습니다!")
             except Exception as e:
                 st.error(f"파일 저장 중 오류: {e}")

@@ -2,19 +2,20 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 from newspaper import Article
-import feedparser
 import google.generativeai as genai
 from datetime import datetime
 import random
 import csv
 import re
 import os
+import xml.etree.ElementTree as ET
+from io import StringIO
 
 # Gemini API 설정
 try:
     genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 except Exception as e:
-    st.error(f"Gemini API 키 설정 오류: {e}")
+    st.error(f"Gemini API 키 설정 오류: {e}. Streamlit Cloud의 Secrets 설정에서 GEMINI_API_KEY를 확인하세요.")
     st.stop()
 
 st.set_page_config(page_title="인공지능과 윤리", layout="wide")
@@ -23,7 +24,11 @@ st.title("📝 최근 기사로 알아보는 AI의 권리침해")
 # 데이터 디렉토리 확인 및 생성
 DATA_DIR = "data"
 if not os.path.exists(DATA_DIR):
-    os.makedirs(DATA_DIR)
+    try:
+        os.makedirs(DATA_DIR)
+    except Exception as e:
+        st.error(f"데이터 디렉토리 생성 실패: {e}")
+        st.stop()
 
 # 요약 함수 정의
 def summarize_article(article_text):
@@ -47,26 +52,45 @@ def fetch_article_text(url):
         article.parse()
         if article.text and len(article.text.strip()) > 200:
             return article.text
-    except:
-        pass
-
+    except Exception as e:
+        st.warning(f"newspaper3k로 기사 추출 실패: {e}. 대체 방법 시도 중...")
+    
     try:
         res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        res.raise_for_status()
         soup = BeautifulSoup(res.text, "html.parser")
         paragraphs = soup.find_all("p")
         text = "\n".join([p.get_text(strip=True) for p in paragraphs])
         return text if len(text.strip()) > 200 else ""
-    except:
+    except Exception as e:
+        st.error(f"기사 본문 추출 실패: {e}")
         return ""
 
 # 구글 뉴스에서 기사 링크 가져오기 (50개 중 랜덤 3개)
 def get_google_news_links(keyword):
-    query = f"AI+{keyword}"
-    rss_url = f"https://news.google.com/rss/search?q={query}&hl=ko&gl=KR&ceid=KR:ko"
-    feed = feedparser.parse(rss_url)
-    all_links = [(entry.title, entry.link) for entry in feed.entries[:50]]
-    selected = random.sample(all_links, k=min(3, len(all_links)))
-    return selected
+    try:
+        query = f"AI+{keyword}"
+        rss_url = f"https://news.google.com/rss/search?q={query}&hl=ko&gl=KR&ceid=KR:ko"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(rss_url, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        # XML 파싱
+        rss_content = StringIO(response.text)
+        tree = ET.parse(rss_content)
+        root = tree.getroot()
+        
+        all_links = []
+        for item in root.findall(".//item")[:50]:
+            title = item.find("title").text if item.find("title") is not None else ""
+            link = item.find("link").text if item.find("link") is not None else ""
+            if title and link:
+                all_links.append((title, link))
+        
+        return random.sample(all_links, k=min(3, len(all_links)))
+    except Exception as e:
+        st.error(f"구글 뉴스 검색 실패: {e}")
+        return []
 
 # 권리 키워드 추정 함수
 def infer_rights(text):
@@ -103,7 +127,7 @@ def save_to_csv(title, link, rights):
 # 키워드 하이라이팅 함수
 def highlight_keywords(text):
     for keyword in ["노동", "파업", "저작권", "표절", "차별", "성별", "사생활", "감시", "얼굴인식", "개인정보", "유출"]:
-        text = re.sub(f"({keyword})", r"**\1**", text)
+        text = re.sub(f"({keyword})", r"**\1**", text, flags=re.IGNORECASE)
     return text
 
 col_left, col_center, col_right = st.columns([1, 4, 1])

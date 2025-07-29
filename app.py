@@ -1,7 +1,7 @@
+
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
-from newspaper import Article
 import google.generativeai as genai
 from datetime import datetime
 import random
@@ -44,17 +44,8 @@ def summarize_article(article_text):
     except Exception as e:
         return f"Gemini 요약 실패: {e}"
 
-# 기사 본문 추출 함수
+# 기사 본문 추출 함수 (newspaper 제거 버전)
 def fetch_article_text(url):
-    try:
-        article = Article(url, language='ko')
-        article.download()
-        article.parse()
-        if article.text and len(article.text.strip()) > 200:
-            return article.text
-    except Exception as e:
-        st.warning(f"newspaper3k로 기사 추출 실패: {e}. 대체 방법 시도 중...")
-    
     try:
         res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
         res.raise_for_status()
@@ -74,19 +65,18 @@ def get_google_news_links(keyword):
         headers = {"User-Agent": "Mozilla/5.0"}
         response = requests.get(rss_url, headers=headers, timeout=10)
         response.raise_for_status()
-        
-        # XML 파싱
+
         rss_content = StringIO(response.text)
         tree = ET.parse(rss_content)
         root = tree.getroot()
-        
+
         all_links = []
         for item in root.findall(".//item")[:50]:
             title = item.find("title").text if item.find("title") is not None else ""
             link = item.find("link").text if item.find("link") is not None else ""
             if title and link:
                 all_links.append((title, link))
-        
+
         return random.sample(all_links, k=min(3, len(all_links)))
     except Exception as e:
         st.error(f"구글 뉴스 검색 실패: {e}")
@@ -208,7 +198,10 @@ with col_center:
             txt_path = os.path.join(DATA_DIR, "data.txt")
             try:
                 with open(txt_path, "a", encoding="utf-8") as f:
-                    f.write(f"[{timestamp}] {user_name}:\n{user_thought}\n\n")
+                    f.write(f"[{timestamp}] {user_name}:
+{user_thought}
+
+")
                 st.success("✅ 생각이 성공적으로 제출되었습니다!")
             except Exception as e:
                 st.error(f"파일 저장 중 오류: {e}")
